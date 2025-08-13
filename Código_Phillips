@@ -1,0 +1,109 @@
+library("readxl")
+datos <- read_excel("datosmartin.xlsx")
+# Suponiendo que 'fecha' es una variable en formato de cadena de caracteres (character)
+datos$fecha <- as.Date(paste(datos$fecha, "01"), format = "%Y-%m-%d")
+library(dplyr)
+library(AER)
+# Suprimir los mensajes de advertencia
+suppressWarnings({
+# Ajustar el modelo de regresión instrumental
+reg <- ivreg(inflacion ~ desempleo + IPP + ocupacion | base_monetaria + interes, data =
+datos)
+})
+summary(reg)
+summary(reg,diagnostics = T)
+# Verificación de la condición de orden
+condicion_orden <- function(k, p) {
+if (k >= p) {
+return("La condición de orden se cumple.")
+} else {
+return("La condición de orden no se cumple.")
+}
+}
+# Verificación de la condición de rango
+condicion_rango <- function(A, p) {
+if (qr(A)$rank == p) {
+return("La condición de rango se cumple.")
+} else {
+return("La condición de rango no se cumple.")
+}
+}
+k <- 4 # Número de variables instrumentales
+p <- 2 # Número de parámetros a estimar en la ecuación
+A <- as.matrix(datos[,c('inflacion','desempleo')]) # Matriz de coeficientes de las
+variables endógenas
+# Verificación de la condición de orden
+resultado_orden <- condicion_orden(k, p)
+print(resultado_orden)
+# Verificación de la condición de rango
+resultado_rango <- condicion_rango(A, p)
+print(resultado_rango)
+library(systemfit)
+# Especificar las ecuaciones estructurales y auxiliares
+eq_inf <- inflacion ~ desempleo + IPP + ocupacion
+eq_des <- desempleo ~ inflacion + IPP + ocupacion
+system <- list(eq1 = eq_inf, eq2 = eq_des)
+instrum <- ~ IPP + ocupacion + base_monetaria + interes
+# Estimar el modelo MC2E utilizando Mínimos Cuadrados en Dos Etapas (MC2E)
+mc2e_model <- systemfit(system, inst = instrum, method = '2SLS', data = datos,
+residCovWeighted = T,
+methodResidCov = "max")
+summary(mc2e_model)
+# Estimar el modelo MC3E utilizando Mínimos Cuadrados en Tres Etapas (MC3E)
+mc3e_model <- systemfit(system, inst = instrum, method = '3SLS', data = datos,
+method3sls = "GMM")
+summary(mc3e_model)
+# Crear una secuencia de fechas desde el primero de enero de 2001 hasta el primero de
+febrero de 2024
+nueva_fecha <- seq(as.Date("2001-01-01"), as.Date("2024-02-01"), by = "month")
+# Invertir el orden de la variable tiempo
+tiempo_invertido <- rev(nueva_fecha)
+# Cargar paquetes necesarios
+library(ggplot2)
+# Crear el gráfico de inflación
+grafico_inflacion <- ggplot(data = datos, aes(x = tiempo_invertido, y = inflacion)) +
+geom_point(aes(color = inflacion)) +
+geom_smooth(method = "loess") +
+labs(x = "Fecha", y = "Inflación", title = "Evolución Inflación") +
+theme_minimal() +
+scale_x_date(date_labels = "%Y-%m") # Especifica el formato de la fecha en el eje x
+grafico_inflacion
+# Crear el gráfico de desempleo
+grafico_desempleo <- ggplot(data = datos, aes(x = tiempo_invertido, y = desempleo)) +
+geom_point(aes(color = desempleo)) +
+geom_smooth(method = "loess") +
+labs(x = "Fecha", y = "Desempleo", title = "Evolución Desempleo") +
+theme_minimal()
+grafico_desempleo
+# Crear el gráfico de ocupación
+grafico_okupa <- ggplot(data = datos, aes(x = tiempo_invertido, y = ocupacion)) +
+geom_point(aes(color = ocupacion)) +
+geom_smooth(method = "loess") +
+labs(x = "Fecha", y = "Ocupación", title = "Evolución Ocupación") +
+theme_minimal()
+grafico_okupa
+# Crear el gráfico de base monetaria
+grafico_monetaria <- ggplot(data = datos, aes(x = tiempo_invertido, y = base_monetaria))
++
+geom_point(aes(color = base_monetaria)) +
+geom_smooth(method = "loess") +
+labs(x = "Fecha", y = "Base monetaria", title = "Evolución Base monetaria") +
+theme_minimal()
+grafico_monetaria
+# Crear el gráfico de tasa de interés
+grafico_interes <- ggplot(data = datos, aes(x = tiempo_invertido, y = interes)) +
+geom_point(aes(color = interes)) +
+geom_smooth(method = "loess") +
+labs(x = "Fecha", y = "Tasa de interés", title = "Evolución Tasa de interés") +
+theme_minimal()
+grafico_interes
+# Crear el gráfico de Índice de precios al productor
+grafico_productor <- ggplot(data = datos, aes(x = tiempo_invertido, y = IPP)) +
+geom_point(aes(color = IPP)) +
+geom_smooth(method = "loess") +
+labs(x = "Fecha", y = "Índice de precios al productor", title = "Evolución Índice de
+precios al productor") +
+theme_minimal()
+grafico_productor
+## Resumen estadístico
+summary(datos[, sapply(datos, is.numeric)])
